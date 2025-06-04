@@ -44,8 +44,8 @@ model = MultinomialNB()
 model.fit(X_train_vec, y_train)
 
 # Simpan model dan vectorizer
-model_path = os.path.join(model_dir, 'multinomial_nb_model.pkl')
-vectorizer_path = os.path.join(model_dir, 'tfidf_vectorizer.pkl')
+model_path = '/content/drive/MyDrive/Final_Project_ML/multinomial_nb_modelUMPOH.pkl'
+vectorizer_path = '/content/drive/MyDrive/Final_Project_ML/tfidf_vectorizerUMPOH.pkl'
 
 with open(model_path, 'wb') as f:
     pickle.dump(model, f)
