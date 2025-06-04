@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""retrain_model.py
-
-Script untuk retrain model deteksi hoaks menggunakan dataset awal + laporan kesalahan dari pengguna.
-"""
+"""retrain_model.py"""
 
 import pandas as pd
 import os
@@ -18,20 +15,17 @@ laporan_path = 'laporan_kesalahan.csv'
 model_path = 'multinomial_nb_modelUMPOH.pkl'
 vectorizer_path = 'tfidf_vectorizerUMPOH.pkl'
 
-# Cek file dataset utama
 if not os.path.exists(dataset_asli):
     raise FileNotFoundError("❌ File dataset asli tidak ditemukan.")
 
-# Baca dataset asli
 df_asli = pd.read_csv(dataset_asli, encoding='ISO-8859-1', engine='python', on_bad_lines='warn')
 
 if 'tweet' not in df_asli.columns or 'label' not in df_asli.columns:
     raise ValueError("Dataset asli harus memiliki kolom 'tweet' dan 'label'.")
 
-# Siapkan data dari laporan pengguna
+# Baca laporan tambahan
 if os.path.exists(laporan_path):
     df_laporan = pd.read_csv(laporan_path)
-
     if all(col in df_laporan.columns for col in ['judul', 'isi', 'label_benar']):
         df_laporan['text'] = df_laporan['judul'] + ' ' + df_laporan['isi']
         df_laporan['label'] = df_laporan['label_benar'].map({'Valid': 0, 'Hoaks': 1})
@@ -43,24 +37,27 @@ else:
     print("ℹ️ Tidak ada laporan kesalahan ditemukan.")
     df_laporan = pd.DataFrame(columns=['text', 'label'])
 
-# Gabungkan dataset
+# Gabungkan
 df_asli.rename(columns={'tweet': 'text'}, inplace=True)
 df_all = pd.concat([df_asli[['text', 'label']], df_laporan], ignore_index=True)
 df_all.dropna(inplace=True)
 
-# Preprocessing
+# Validasi jumlah label
+if len(df_all['label'].unique()) < 2:
+    raise ValueError("❌ Dataset hanya mengandung satu kelas. Model tidak dapat dilatih.")
+
 X = df_all['text'].astype(str)
 y = df_all['label']
 
-# Stopword removal
+# Stopword
 factory = StopWordRemoverFactory()
 stopwords = factory.get_stop_words()
 
-# Vectorization
+# Vectorizer
 vectorizer = TfidfVectorizer(stop_words=stopwords, max_features=5000)
 X_vec = vectorizer.fit_transform(X)
 
-# Model training
+# Train model
 model = MultinomialNB()
 model.fit(X_vec, y)
 
