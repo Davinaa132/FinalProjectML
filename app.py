@@ -69,14 +69,27 @@ if st.button("🔍 Deteksi"):
 
                 # Diasumsikan: kelas 0 = VALID, kelas 1 = HOAKS
                 prob_valid = proba_array[0]
+                prob_hoax = proba_array[1]
 
-                # Threshold keputusan
+                # Threshold untuk klasifikasi VALID
                 threshold_valid = 0.40
 
                 if prob_valid >= threshold_valid:
                     st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
                 else:
-                    st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {1 - prob_valid:.2f})")
+                    st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax:.2f})")
+
+                # Tampilkan detail probabilitas
+                st.markdown(
+                    f"""<hr>
+                    <h4>📊 Probabilitas Klasifikasi:</h4>
+                    <ul>
+                        <li><strong>Valid:</strong> {prob_valid:.2f}</li>
+                        <li><strong>Hoaks:</strong> {prob_hoax:.2f}</li>
+                    </ul>
+                    """,
+                    unsafe_allow_html=True
+                )
 
             except Exception as e:
                 st.error(f"Gagal menghitung probabilitas: {e}")
