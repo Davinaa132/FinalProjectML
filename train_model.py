@@ -12,29 +12,30 @@ import pickle
 import os
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 
-# Pastikan path file CSV relatif atau lokal
-data_path = 'Scrapping.csv'  # Disarankan: folder `data/` dalam repo
+# Path dataset dan folder output model
+data_path = 'datasetUMPOHoax.csv'  # ← Ganti ke file baru
 model_dir = 'model'
 os.makedirs(model_dir, exist_ok=True)
 
-# Membaca data
-df = pd.read_csv(data_path, encoding='ISO-8859-1', engine='python', on_bad_lines='warn', delimiter=';')
+# Baca dataset
+df = pd.read_csv(data_path, encoding='ISO-8859-1', engine='python', on_bad_lines='warn')
 
-# Gabungkan kolom headline + body
-df['text'] = df['Headline'].astype(str) + " " + df['Body'].astype(str)
+# Pastikan kolom yang dibutuhkan ada
+if 'tweet' not in df.columns or 'label' not in df.columns:
+    raise ValueError("Dataset harus memiliki kolom 'tweet' dan 'label'.")
 
-# Split fitur dan label
-X = df['text']
-y = df['Label']
+# Ambil fitur dan label
+X = df['tweet'].astype(str)
+y = df['label']
 
-# Bagi data latih dan uji
+# Split train-test
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Stopword Indonesia
+# Stopword bahasa Indonesia dari Sastrawi
 factory = StopWordRemoverFactory()
 indonesian_stop_words = factory.get_stop_words()
 
-# TF-IDF
+# TF-IDF Vectorizer
 vectorizer = TfidfVectorizer(stop_words=indonesian_stop_words, max_features=5000)
 X_train_vec = vectorizer.fit_transform(X_train)
 
