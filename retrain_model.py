@@ -1,74 +1,79 @@
-# -*- coding: utf-8 -*-
-"""retrain_model.py"""
+# retrain_model.py
 
 import pandas as pd
+import re
 import os
 import pickle
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.feature_extraction.text import TfidfVectorizer
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 
-# Path
-dataset_asli = 'datasetUMPOHoax.csv'
-laporan_path = 'laporan_kesalahan.csv'
-model_path = 'multinomial_nb_modelUMPOH.pkl'
-vectorizer_path = 'tfidf_vectorizerUMPOH.pkl'
+# ----------------------
+# Fungsi preprocessing
+# ----------------------
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r'[^a-zA-Z0-9\s.,]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
-if not os.path.exists(dataset_asli):
-    raise FileNotFoundError("❌ File dataset asli tidak ditemukan.")
+# ----------------------
+# Load data awal
+# ----------------------
+print("📥 Membaca dataset utama...")
+try:
+    df_awal = pd.read_csv("datasetUMPOHoax.csv")
+    df_awal = df_awal[['judul', 'isi', 'label']]  # Pastikan kolom sesuai
+    df_awal.dropna(inplace=True)
+    df_awal['text'] = df_awal['judul'] + " " + df_awal['isi']
+    df_awal['text'] = df_awal['text'].apply(clean_text)
+    df_awal = df_awal[['text', 'label']]
+    print(f"✅ Dataset utama: {len(df_awal)} baris")
+except Exception as e:
+    print(f"❌ Gagal membaca dataset utama: {e}")
+    exit()
 
-df_asli = pd.read_csv(dataset_asli, encoding='ISO-8859-1', engine='python', on_bad_lines='warn')
+# ----------------------
+# Load laporan kesalahan
+# ----------------------
+laporan_path = "laporan_kesalahan.csv"
+df_laporan = pd.DataFrame()
 
-if 'tweet' not in df_asli.columns or 'label' not in df_asli.columns:
-    raise ValueError("Dataset asli harus memiliki kolom 'tweet' dan 'label'.")
-
-# Baca laporan tambahan
 if os.path.exists(laporan_path):
-    df_laporan = pd.read_csv(laporan_path)
-    if all(col in df_laporan.columns for col in ['judul', 'isi', 'label_benar']):
-        df_laporan['text'] = df_laporan['judul'] + ' ' + df_laporan['isi']
+    print("📥 Membaca laporan kesalahan pengguna...")
+    try:
+        df_laporan = pd.read_csv(laporan_path)
+        df_laporan = df_laporan[['judul', 'isi', 'label_benar']]
+        df_laporan.dropna(inplace=True)
+        df_laporan['text'] = (df_laporan['judul'] + " " + df_laporan['isi']).apply(clean_text)
         df_laporan['label'] = df_laporan['label_benar'].map({'Valid': 0, 'Hoaks': 1})
+        df_laporan.dropna(subset=['label'], inplace=True)
+        df_laporan['label'] = df_laporan['label'].astype(int)
         df_laporan = df_laporan[['text', 'label']]
-    else:
-        print("⚠️ Kolom dalam laporan tidak lengkap. Lewati laporan.")
-        df_laporan = pd.DataFrame(columns=['text', 'label'])
+        print(f"✅ Laporan ditambahkan: {len(df_laporan)} baris")
+    except Exception as e:
+        print(f"⚠️ Gagal membaca laporan kesalahan: {e}")
 else:
     print("ℹ️ Tidak ada laporan kesalahan ditemukan.")
-    df_laporan = pd.DataFrame(columns=['text', 'label'])
 
-# Gabungkan
-df_asli.rename(columns={'tweet': 'text'}, inplace=True)
-df_all = pd.concat([df_asli[['text', 'label']], df_laporan], ignore_index=True)
+# ----------------------
+# Gabungkan dan bersihkan data
+# ----------------------
+df_all = pd.concat([df_awal, df_laporan], ignore_index=True)
+df_all.drop_duplicates(subset='text', inplace=True)
 df_all.dropna(inplace=True)
 
-# Validasi jumlah label
-if len(df_all['label'].unique()) < 2:
-    raise ValueError("❌ Dataset hanya mengandung satu kelas. Model tidak dapat dilatih.")
+if df_all['label'].nunique() < 2:
+    print("❌ Gagal: Data tidak mencakup dua kelas berbeda (valid dan hoaks).")
+    exit()
 
-X = df_all['text'].astype(str)
-y = df_all['label']
+print(f"🧹 Total data setelah penggabungan dan pembersihan: {len(df_all)} baris")
 
-# Stopword
-factory = StopWordRemoverFactory()
-stopwords = factory.get_stop_words()
+# ----------------------
+# TF-IDF & Pelatihan Model
+# ----------------------
+stopwords = StopWordRemoverFactory().get_stop_words()
 
-# Vectorizer
 vectorizer = TfidfVectorizer(stop_words=stopwords, max_features=5000)
-X_vec = vectorizer.fit_transform(X)
-
-# Train model
-model = MultinomialNB()
-model.fit(X_vec, y)
-
-# Simpan model & vectorizer
-with open(model_path, 'wb') as f:
-    pickle.dump(model, f)
-
-with open(vectorizer_path, 'wb') as f:
-    pickle.dump(vectorizer, f)
-
-print("✅ Model berhasil dilatih ulang dan disimpan.")
-print(f"- Total data dilatih: {len(df_all)}")
-if not df_laporan.empty:
-    print(f"- Termasuk {len(df_laporan)} laporan dari pengguna.")
