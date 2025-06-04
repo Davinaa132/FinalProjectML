@@ -9,8 +9,8 @@ import pickle
 import os
 
 # Ganti path ini jika file disimpan di folder lain
-model_path = 'model/multinomial_nb_model.pkl'
-vectorizer_path = 'model/tfidf_vectorizer.pkl'
+model_path = 'multinomial_nb_modelUMPOH.pkl'
+vectorizer_path = 'tfidf_vectorizerUMPOH.pkl'
 
 # Cek keberadaan file
 if not os.path.exists(model_path) or not os.path.exists(vectorizer_path):
