@@ -13,7 +13,7 @@ import os
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 
 # Pastikan path file CSV relatif atau lokal
-data_path = 'data/Scrapping.csv'  # Disarankan: folder `data/` dalam repo
+data_path = 'Scrapping.csv'  # Disarankan: folder `data/` dalam repo
 model_dir = 'model'
 os.makedirs(model_dir, exist_ok=True)
 
