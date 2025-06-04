@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """app.py
 
-Aplikasi Streamlit untuk deteksi hoaks berdasarkan judul dan URL berita,
-dengan fitur pelaporan kesalahan dan pembelajaran dari laporan.
+Aplikasi Streamlit untuk deteksi hoaks dengan peningkatan akurasi dan logika klasifikasi yang diperbaiki.
 """
 
 import streamlit as st
@@ -11,23 +10,27 @@ import os
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import re
 from datetime import datetime
 
+# ------------------------------
 # Daftar sumber berita resmi
+# ------------------------------
 sumber_resmi = [
     "cnnindonesia.com", "kompas.com", "tempo.co", "antaranews.com",
     "detik.com", "liputan6.com", "beritasatu.com",
     "bbc.com", "cnbcindonesia.com", "republika.co.id"
 ]
 
-# Fungsi cek apakah URL berasal dari sumber resmi
 def is_sumber_resmi(url):
     for domain in sumber_resmi:
         if domain in url:
             return True
     return False
 
-# Fungsi simpan laporan ke file CSV
+# ------------------------------
+# Fungsi simpan laporan ke CSV
+# ------------------------------
 def simpan_laporan(judul, url, isi, prediksi_awal, label_benar):
     data = {
         "timestamp": datetime.now().isoformat(),
@@ -35,7 +38,8 @@ def simpan_laporan(judul, url, isi, prediksi_awal, label_benar):
         "url": url,
         "isi": isi,
         "prediksi_awal": prediksi_awal,
-        "label_benar": label_benar
+        "label_benar": label_benar,
+        "sumber_resmi": is_sumber_resmi(url)
     }
     df = pd.DataFrame([data])
     if os.path.exists("laporan_kesalahan.csv"):
@@ -43,7 +47,31 @@ def simpan_laporan(judul, url, isi, prediksi_awal, label_benar):
     else:
         df.to_csv("laporan_kesalahan.csv", index=False)
 
+# ------------------------------
+# Bersihkan isi teks
+# ------------------------------
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[^a-zA-Z0-9\s.,]', '', text)
+    return text.strip()
+
+# ------------------------------
+# Ambil isi artikel dari URL
+# ------------------------------
+def extract_article_from_url(url):
+    try:
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        paragraphs = soup.find_all('p')
+        isi = ' '.join([p.get_text() for p in paragraphs])
+        return clean_text(isi)
+    except Exception as e:
+        return f"[Gagal mengambil isi dari URL: {e}]"
+
+# ------------------------------
 # Load model & vectorizer
+# ------------------------------
 model_path = 'multinomial_nb_modelUMPOH.pkl'
 vectorizer_path = 'tfidf_vectorizerUMPOH.pkl'
 
@@ -57,17 +85,9 @@ with open(model_path, 'rb') as f:
 with open(vectorizer_path, 'rb') as f:
     vectorizer = pickle.load(f)
 
-# Ambil isi dari URL
-def extract_article_from_url(url):
-    try:
-        response = requests.get(url, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        paragraphs = soup.find_all('p')
-        return ' '.join([p.get_text() for p in paragraphs]).strip()
-    except Exception as e:
-        return f"[Gagal mengambil isi dari URL: {e}]"
-
+# ------------------------------
 # Streamlit UI
+# ------------------------------
 st.set_page_config(page_title="Deteksi Hoaks Berita", layout="centered")
 st.title("📰 Deteksi Hoaks dari Judul dan URL Berita")
 st.markdown("Masukkan **judul** dan **tautan URL** berita. Sistem akan mendeteksi apakah berita tersebut hoaks atau valid.")
@@ -87,36 +107,36 @@ if st.button("🔍 Deteksi"):
         else:
             full_text = judul + " " + isi
             X_input = vectorizer.transform([full_text])
-            prediction = model.predict(X_input)[0]
+            proba_array = model.predict_proba(X_input)[0]
+            prob_valid, prob_hoax = proba_array
 
-            # Probabilitas klasifikasi
-            try:
-                proba_array = model.predict_proba(X_input)[0]
-                prob_valid = proba_array[0]
-                prob_hoax = proba_array[1]
-            except Exception:
-                prob_valid = 0.0
-                prob_hoax = 0.0
+            # Tambahkan bobot ke valid jika sumber resmi
+            if is_sumber_resmi(url):
+                prob_valid += 0.15
+                prob_valid = min(prob_valid, 1.0)
+                prob_hoax = 1.0 - prob_valid
 
-            # Threshold valid minimum 0.40
-            threshold_valid = 0.40
-            if prob_valid >= threshold_valid:
+            # Logika klasifikasi
+            if prob_valid >= 0.60:
+                status = "VALID"
                 st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
-                hasil_prediksi = "Valid"
-            else:
+            elif prob_hoax >= 0.60:
+                status = "HOAKS"
                 st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax:.2f})")
-                hasil_prediksi = "Hoaks"
+            else:
+                status = "TIDAK YAKIN"
+                st.warning(f"🤔 Deteksi: **TIDAK YAKIN** (Valid: {prob_valid:.2f} | Hoaks: {prob_hoax:.2f})")
                 if is_sumber_resmi(url):
-                    st.info("⚠️ *Hasil mungkin tidak akurat karena sumber berita berasal dari media resmi.*")
+                    st.info("⚠️ *Model tidak yakin, tapi sumber berasal dari media resmi.*")
 
-            # Tampilkan detail probabilitas
+            # Probabilitas detail
             st.markdown("### 📊 Probabilitas Klasifikasi:")
             st.markdown(f"- **Valid:** {prob_valid:.2f}")
             st.markdown(f"- **Hoaks:** {prob_hoax:.2f}")
 
-            # Tombol pelaporan kesalahan
+            # Form pelaporan kesalahan
             with st.expander("🔁 Apakah hasil ini salah?"):
                 label_benar = st.radio("Menurut Anda, berita ini sebenarnya:", ["Valid", "Hoaks"])
                 if st.button("📩 Laporkan Kesalahan Deteksi"):
-                    simpan_laporan(judul, url, isi, hasil_prediksi, label_benar)
+                    simpan_laporan(judul, url, isi, status, label_benar)
                     st.success("✅ Laporan Anda telah disimpan. Terima kasih!")
