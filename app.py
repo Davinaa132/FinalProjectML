@@ -10,6 +10,27 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
+# Daftar sumber berita resmi
+sumber_resmi = [
+    "cnnindonesia.com",
+    "kompas.com",
+    "tempo.co",
+    "antaranews.com",
+    "detik.com",
+    "liputan6.com",
+    "beritasatu.com",
+    "bbc.com",
+    "cnbcindonesia.com",
+    "republika.co.id"
+]
+
+# Fungsi cek apakah URL berasal dari sumber resmi
+def is_sumber_resmi(url):
+    for domain in sumber_resmi:
+        if domain in url:
+            return True
+    return False
+
 # Ganti path model jika disimpan di folder lain
 model_path = 'multinomial_nb_modelUMPOH.pkl'
 vectorizer_path = 'tfidf_vectorizerUMPOH.pkl'
@@ -62,34 +83,30 @@ if st.button("🔍 Deteksi"):
         else:
             full_text = judul + " " + isi
             X_input = vectorizer.transform([full_text])
+            prediction = model.predict(X_input)[0]
 
+            # Tangani kemungkinan error predict_proba
             try:
-                # Ambil probabilitas untuk masing-masing kelas
                 proba_array = model.predict_proba(X_input)[0]
-
-                # Diasumsikan: kelas 0 = VALID, kelas 1 = HOAKS
                 prob_valid = proba_array[0]
                 prob_hoax = proba_array[1]
+            except Exception:
+                prob_valid = 0.0
+                prob_hoax = 0.0
 
-                # Threshold untuk klasifikasi VALID
-                threshold_valid = 0.40
+            # Threshold klasifikasi valid minimal 40%
+            threshold_valid = 0.40
 
-                if prob_valid >= threshold_valid:
-                    st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
-                else:
-                    st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax:.2f})")
+            if prob_valid >= threshold_valid:
+                st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
+            else:
+                st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax:.2f})")
 
-                # Tampilkan detail probabilitas
-                st.markdown(
-                    f"""<hr>
-                    <h4>📊 Probabilitas Klasifikasi:</h4>
-                    <ul>
-                        <li><strong>Valid:</strong> {prob_valid:.2f}</li>
-                        <li><strong>Hoaks:</strong> {prob_hoax:.2f}</li>
-                    </ul>
-                    """,
-                    unsafe_allow_html=True
-                )
+                # Peringatan jika dari sumber resmi
+                if is_sumber_resmi(url):
+                    st.info("⚠️ *Hasil ini mungkin tidak akurat karena berita berasal dari sumber resmi. Pertimbangkan untuk memverifikasi secara manual.*")
 
-            except Exception as e:
-                st.error(f"Gagal menghitung probabilitas: {e}")
+            # Tampilkan probabilitas untuk transparansi
+            st.markdown("### 📊 Probabilitas Klasifikasi:")
+            st.markdown(f"- **Valid:** {prob_valid:.2f}")
+            st.markdown(f"- **Hoaks:** {prob_hoax:.2f}")
