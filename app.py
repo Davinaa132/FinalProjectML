@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""app.py
-
-Aplikasi Streamlit untuk deteksi hoaks dengan peningkatan akurasi dan logika klasifikasi yang diperbaiki.
-"""
-
+"""app.py"""
 import streamlit as st
 import pickle
 import os
@@ -13,9 +9,9 @@ import pandas as pd
 import re
 from datetime import datetime
 
-# ------------------------------
+# --------------------------
 # Daftar sumber berita resmi
-# ------------------------------
+# --------------------------
 sumber_resmi = [
     "cnnindonesia.com", "kompas.com", "tempo.co", "antaranews.com",
     "detik.com", "liputan6.com", "beritasatu.com",
@@ -23,14 +19,11 @@ sumber_resmi = [
 ]
 
 def is_sumber_resmi(url):
-    for domain in sumber_resmi:
-        if domain in url:
-            return True
-    return False
+    return any(domain in url for domain in sumber_resmi)
 
-# ------------------------------
-# Fungsi simpan laporan ke CSV
-# ------------------------------
+# --------------------------
+# Simpan laporan ke CSV
+# --------------------------
 def simpan_laporan(judul, url, isi, prediksi_awal, label_benar):
     data = {
         "timestamp": datetime.now().isoformat(),
@@ -47,18 +40,15 @@ def simpan_laporan(judul, url, isi, prediksi_awal, label_benar):
     else:
         df.to_csv("laporan_kesalahan.csv", index=False)
 
-# ------------------------------
-# Bersihkan isi teks
-# ------------------------------
+# --------------------------
+# Preprocessing text
+# --------------------------
 def clean_text(text):
     text = text.lower()
     text = re.sub(r'\s+', ' ', text)
     text = re.sub(r'[^a-zA-Z0-9\s.,]', '', text)
     return text.strip()
 
-# ------------------------------
-# Ambil isi artikel dari URL
-# ------------------------------
 def extract_article_from_url(url):
     try:
         response = requests.get(url, timeout=10)
@@ -69,9 +59,9 @@ def extract_article_from_url(url):
     except Exception as e:
         return f"[Gagal mengambil isi dari URL: {e}]"
 
-# ------------------------------
+# --------------------------
 # Load model & vectorizer
-# ------------------------------
+# --------------------------
 model_path = 'multinomial_nb_modelUMPOH.pkl'
 vectorizer_path = 'tfidf_vectorizerUMPOH.pkl'
 
@@ -85,9 +75,9 @@ with open(model_path, 'rb') as f:
 with open(vectorizer_path, 'rb') as f:
     vectorizer = pickle.load(f)
 
-# ------------------------------
+# --------------------------
 # Streamlit UI
-# ------------------------------
+# --------------------------
 st.set_page_config(page_title="Deteksi Hoaks Berita", layout="centered")
 st.title("📰 Deteksi Hoaks dari Judul dan URL Berita")
 st.markdown("Masukkan **judul** dan **tautan URL** berita. Sistem akan mendeteksi apakah berita tersebut hoaks atau valid.")
@@ -107,8 +97,16 @@ if st.button("🔍 Deteksi"):
         else:
             full_text = judul + " " + isi
             X_input = vectorizer.transform([full_text])
+
             proba_array = model.predict_proba(X_input)[0]
-            prob_valid, prob_hoax = proba_array
+            prob_valid = prob_hoax = 0.0
+
+            # Map berdasarkan kelas
+            for i, cls in enumerate(model.classes_):
+                if cls == 0:
+                    prob_valid = proba_array[i]
+                elif cls == 1:
+                    prob_hoax = proba_array[i]
 
             # Tambahkan bobot ke valid jika sumber resmi
             if is_sumber_resmi(url):
