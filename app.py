@@ -62,20 +62,21 @@ if st.button("🔍 Deteksi"):
         else:
             full_text = judul + " " + isi
             X_input = vectorizer.transform([full_text])
-            prediction = model.predict(X_input)[0]
 
-            # Tangani kemungkinan error predict_proba
             try:
+                # Ambil probabilitas untuk masing-masing kelas
                 proba_array = model.predict_proba(X_input)[0]
-                if len(proba_array) == 2:
-                    proba = proba_array[prediction]
-                else:
-                    proba = proba_array[0]
-            except Exception:
-                proba = 0.0
 
-            # Tampilkan hasil
-            if prediction == 1:
-                st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {proba:.2f})")
-            else:
-                st.success(f"✅ Deteksi: **VALID** (Probabilitas: {proba:.2f})")
+                # Diasumsikan: kelas 0 = VALID, kelas 1 = HOAKS
+                prob_valid = proba_array[0]
+
+                # Threshold keputusan
+                threshold_valid = 0.40
+
+                if prob_valid >= threshold_valid:
+                    st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
+                else:
+                    st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {1 - prob_valid:.2f})")
+
+            except Exception as e:
+                st.error(f"Gagal menghitung probabilitas: {e}")
