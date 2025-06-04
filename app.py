@@ -79,18 +79,22 @@ with open(vectorizer_path, 'rb') as f:
 # Streamlit UI
 # --------------------------
 st.set_page_config(page_title="Deteksi Hoaks Berita", layout="centered")
-st.title("📰 Deteksi Hoaks dari Judul dan URL Berita")
-st.markdown("Masukkan **judul** dan **tautan URL** berita. Sistem akan mendeteksi apakah berita tersebut hoaks atau valid.")
+st.title("📰 Deteksi Hoaks Berita")
+st.markdown("Masukkan **judul**, lalu pilih antara mengisi **URL berita** atau menulis **isi berita** secara manual.")
 
 judul = st.text_input("📝 Judul Berita")
 url = st.text_input("🔗 URL Berita")
+isi_manual = st.text_area("📄 Isi Berita (jika tidak ada URL)", height=200)
 
 if st.button("🔍 Deteksi"):
-    if not judul or not url:
-        st.warning("⚠️ Silakan isi judul dan URL terlebih dahulu.")
+    if not judul or (not url and not isi_manual):
+        st.warning("⚠️ Harap isi judul dan salah satu dari URL atau isi berita.")
     else:
-        st.info("📡 Mengambil isi berita dari URL...")
-        isi = extract_article_from_url(url)
+        if url:
+            st.info("📡 Mengambil isi berita dari URL...")
+            isi = extract_article_from_url(url)
+        else:
+            isi = clean_text(isi_manual)
 
         if isi.startswith("[Gagal"):
             st.error(isi)
@@ -101,20 +105,20 @@ if st.button("🔍 Deteksi"):
             proba_array = model.predict_proba(X_input)[0]
             prob_valid = prob_hoax = 0.0
 
-            # Map berdasarkan kelas
+            # Mapping berdasarkan label
             for i, cls in enumerate(model.classes_):
                 if cls == 0:
                     prob_valid = proba_array[i]
                 elif cls == 1:
                     prob_hoax = proba_array[i]
 
-            # Tambahkan bobot ke valid jika sumber resmi
-            if is_sumber_resmi(url):
+            # Tambahkan bobot valid jika sumber resmi
+            if url and is_sumber_resmi(url):
                 prob_valid += 0.15
                 prob_valid = min(prob_valid, 1.0)
                 prob_hoax = 1.0 - prob_valid
 
-            # Logika klasifikasi
+            # Penentuan status
             if prob_valid >= 0.60:
                 status = "VALID"
                 st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
@@ -124,10 +128,10 @@ if st.button("🔍 Deteksi"):
             else:
                 status = "TIDAK YAKIN"
                 st.warning(f"🤔 Deteksi: **TIDAK YAKIN** (Valid: {prob_valid:.2f} | Hoaks: {prob_hoax:.2f})")
-                if is_sumber_resmi(url):
+                if url and is_sumber_resmi(url):
                     st.info("⚠️ *Model tidak yakin, tapi sumber berasal dari media resmi.*")
 
-            # Probabilitas detail
+            # Tampilkan detail probabilitas
             st.markdown("### 📊 Probabilitas Klasifikasi:")
             st.markdown(f"- **Valid:** {prob_valid:.2f}")
             st.markdown(f"- **Hoaks:** {prob_hoax:.2f}")
@@ -136,5 +140,5 @@ if st.button("🔍 Deteksi"):
             with st.expander("🔁 Apakah hasil ini salah?"):
                 label_benar = st.radio("Menurut Anda, berita ini sebenarnya:", ["Valid", "Hoaks"])
                 if st.button("📩 Laporkan Kesalahan Deteksi"):
-                    simpan_laporan(judul, url, isi, status, label_benar)
+                    simpan_laporan(judul, url or "-", isi, status, label_benar)
                     st.success("✅ Laporan Anda telah disimpan. Terima kasih!")
