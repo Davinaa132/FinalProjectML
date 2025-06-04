@@ -112,24 +112,19 @@ if st.button("🔍 Deteksi"):
                 elif cls == 1:
                     prob_hoax = proba_array[i]
 
-            # Tambahkan bobot valid jika sumber resmi
+            # Tambahkan bobot valid jika dari sumber resmi
             if url and is_sumber_resmi(url):
                 prob_valid += 0.15
                 prob_valid = min(prob_valid, 1.0)
                 prob_hoax = 1.0 - prob_valid
 
-            # Penentuan status
-            if prob_valid >= 0.60:
+            # Penentuan status pasti
+            if prob_valid > prob_hoax:
                 status = "VALID"
                 st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
-            elif prob_hoax >= 0.60:
+            else:
                 status = "HOAKS"
                 st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax:.2f})")
-            else:
-                status = "TIDAK YAKIN"
-                st.warning(f"🤔 Deteksi: **TIDAK YAKIN** (Valid: {prob_valid:.2f} | Hoaks: {prob_hoax:.2f})")
-                if url and is_sumber_resmi(url):
-                    st.info("⚠️ *Model tidak yakin, tapi sumber berasal dari media resmi.*")
 
             # Tampilkan detail probabilitas
             st.markdown("### 📊 Probabilitas Klasifikasi:")
