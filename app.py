@@ -105,33 +105,40 @@ if st.button("🔍 Deteksi"):
             proba_array = model.predict_proba(X_input)[0]
             prob_valid = prob_hoax = 0.0
 
-            # Mapping berdasarkan label
+            # Mapping label
             for i, cls in enumerate(model.classes_):
                 if cls == 0:
                     prob_valid = proba_array[i]
                 elif cls == 1:
                     prob_hoax = proba_array[i]
 
-            # Tambahkan bobot valid jika dari sumber resmi
+            # Tambahkan bobot jika dari sumber resmi
             if url and is_sumber_resmi(url):
                 prob_valid += 0.15
                 prob_valid = min(prob_valid, 1.0)
                 prob_hoax = 1.0 - prob_valid
 
-            # Penentuan status pasti
+            # Konversi ke persen dan penyesuaian
             if prob_valid > prob_hoax:
                 status = "VALID"
-                st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid:.2f})")
+                prob_valid = round(prob_valid * 100)
+                prob_valid = min(prob_valid, 39)
+                prob_hoax = 100 - prob_valid
+                st.success(f"✅ Deteksi: **VALID** (Probabilitas: {prob_valid}%)")
             else:
                 status = "HOAKS"
-                st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax:.2f})")
+                prob_hoax = round(prob_hoax * 100)
+                prob_hoax = max(prob_hoax, 40)
+                prob_hoax = min(prob_hoax, 100)
+                prob_valid = 100 - prob_hoax
+                st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax}%)")
 
-            # Tampilkan detail probabilitas
+            # Tampilkan detail
             st.markdown("### 📊 Probabilitas Klasifikasi:")
-            st.markdown(f"- **Valid:** {prob_valid:.2f}")
-            st.markdown(f"- **Hoaks:** {prob_hoax:.2f}")
+            st.markdown(f"- **Valid:** {prob_valid}%")
+            st.markdown(f"- **Hoaks:** {prob_hoax}%")
 
-            # Form pelaporan kesalahan
+            # Pelaporan
             with st.expander("🔁 Apakah hasil ini salah?"):
                 label_benar = st.radio("Menurut Anda, berita ini sebenarnya:", ["Valid", "Hoaks"])
                 if st.button("📩 Laporkan Kesalahan Deteksi"):
