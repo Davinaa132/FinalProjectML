@@ -105,7 +105,6 @@ if st.button("🔍 Deteksi"):
             proba_array = model.predict_proba(X_input)[0]
             prob_valid = prob_hoax = 0.0
 
-            # Mapping label
             for i, cls in enumerate(model.classes_):
                 if cls == 0:
                     prob_valid = proba_array[i]
@@ -113,12 +112,14 @@ if st.button("🔍 Deteksi"):
                     prob_hoax = proba_array[i]
 
             # Tambahkan bobot jika dari sumber resmi
+            sumber_resmi_flag = False
             if url and is_sumber_resmi(url):
-                prob_valid += 0.15
+                sumber_resmi_flag = True
+                prob_valid += 0.4
                 prob_valid = min(prob_valid, 1.0)
                 prob_hoax = 1.0 - prob_valid
 
-            # Konversi ke persen dan penyesuaian
+            # Penyesuaian probabilitas ke persen
             if prob_valid > prob_hoax:
                 status = "VALID"
                 prob_valid = round(prob_valid * 100)
@@ -133,12 +134,15 @@ if st.button("🔍 Deteksi"):
                 prob_valid = 100 - prob_hoax
                 st.error(f"🚨 Deteksi: **HOAKS** (Probabilitas: {prob_hoax}%)")
 
-            # Tampilkan detail
+                if sumber_resmi_flag:
+                    st.warning("⚠️ Berita berasal dari sumber resmi, namun tetap terdeteksi sebagai hoaks. Harap periksa isi berita secara seksama.")
+
+            # Tampilkan detail probabilitas
             st.markdown("### 📊 Probabilitas Klasifikasi:")
             st.markdown(f"- **Valid:** {prob_valid}%")
             st.markdown(f"- **Hoaks:** {prob_hoax}%")
 
-            # Pelaporan
+            # Pelaporan kesalahan
             with st.expander("🔁 Apakah hasil ini salah?"):
                 label_benar = st.radio("Menurut Anda, berita ini sebenarnya:", ["Valid", "Hoaks"])
                 if st.button("📩 Laporkan Kesalahan Deteksi"):
